@@ -70,6 +70,10 @@ MONGO_VECTOR_COLLECTION = get_env_variable(
 CHUNK_SIZE = int(get_env_variable("CHUNK_SIZE", "1500"))
 CHUNK_OVERLAP = int(get_env_variable("CHUNK_OVERLAP", "100"))
 
+# Markdown semantic chunking configuration
+env_value = get_env_variable("ENABLE_MARKDOWN_SEMANTIC_CHUNKING", "True").lower()
+ENABLE_MARKDOWN_SEMANTIC_CHUNKING = True if env_value == "true" else False
+
 env_value = get_env_variable("PDF_EXTRACT_IMAGES", "False").lower()
 PDF_EXTRACT_IMAGES = True if env_value == "true" else False
 

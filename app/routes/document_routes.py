@@ -19,10 +19,17 @@ from fastapi import (
 )
 from langchain_core.documents import Document
 from langchain_core.runnables import run_in_executor
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 from functools import lru_cache
 
-from app.config import logger, vector_store, RAG_UPLOAD_DIR, CHUNK_SIZE, CHUNK_OVERLAP
+from app.config import (
+    logger,
+    vector_store,
+    RAG_UPLOAD_DIR,
+    CHUNK_SIZE,
+    CHUNK_OVERLAP,
+    ENABLE_MARKDOWN_SEMANTIC_CHUNKING,
+)
 from app.constants import ERROR_MESSAGES
 from app.models import (
     StoreDocument,
@@ -352,11 +359,37 @@ async def store_data_in_vector_db(
     user_id: str = "",
     clean_content: bool = False,
     executor=None,
+    file_ext: str = "",
 ) -> bool:
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
-    )
-    documents = text_splitter.split_documents(data)
+    # Use Markdown-specific semantic chunking for .md files
+    if file_ext == "md" and ENABLE_MARKDOWN_SEMANTIC_CHUNKING:
+        logger.info(f"Using Markdown semantic chunking for file: {file_id}")
+
+        # Define markdown headers to split on
+        headers_to_split_on = [
+            ("#", "Header 1"),
+            ("##", "Header 2"),
+            ("###", "Header 3"),
+            ("####", "Header 4"),
+        ]
+
+        # Split by markdown headers only - preserve natural semantic boundaries
+        markdown_splitter = MarkdownHeaderTextSplitter(
+            headers_to_split_on=headers_to_split_on,
+            strip_headers=False,
+        )
+
+        # Split documents by markdown headers
+        documents = []
+        for doc in data:
+            splits = markdown_splitter.split_text(doc.page_content)
+            documents.extend(splits)
+    else:
+        # Use default recursive character text splitter for other file types
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
+        )
+        documents = text_splitter.split_documents(data)
 
     # If `clean_content` is True, clean the page_content of each document (remove null bytes)
     if clean_content:
@@ -368,10 +401,10 @@ async def store_data_in_vector_db(
         Document(
             page_content=doc.page_content,
             metadata={
+                **(doc.metadata or {}),
                 "file_id": file_id,
                 "user_id": user_id,
                 "digest": generate_digest(doc.page_content),
-                **(doc.metadata or {}),
             },
         )
         for doc in documents
@@ -429,6 +462,7 @@ async def embed_local_file(
             user_id,
             clean_content=file_ext == "pdf",
             executor=request.app.state.thread_pool,
+            file_ext=file_ext,
         )
 
         if result:
@@ -496,6 +530,7 @@ async def embed_file(
             user_id=user_id,
             clean_content=file_ext == "pdf",
             executor=request.app.state.thread_pool,
+            file_ext=file_ext,
         )
 
         if not result:
@@ -622,6 +657,7 @@ async def embed_file_upload(
             user_id,
             clean_content=file_ext == "pdf",
             executor=request.app.state.thread_pool,
+            file_ext=file_ext,
         )
 
         if not result:

@@ -57,8 +57,9 @@ The following environment variables are required to run the application:
   - Omit to run API without requiring authentication
 
 - `COLLECTION_NAME`: (Optional) The name of the collection in the vector store. Default value is "testcollection".
-- `CHUNK_SIZE`: (Optional) The size of the chunks for text processing. Default value is "1500".
-- `CHUNK_OVERLAP`: (Optional) The overlap between chunks during text processing. Default value is "100".
+- `CHUNK_SIZE`: (Optional) The size of the chunks for text processing (applies to non-Markdown files). Default value is "1500".
+- `CHUNK_OVERLAP`: (Optional) The overlap between chunks during text processing (applies to non-Markdown files). Default value is "100".
+- `ENABLE_MARKDOWN_SEMANTIC_CHUNKING`: (Optional) Enable semantic chunking for Markdown files using header-based splitting. Default value is "True".
 - `RAG_UPLOAD_DIR`: (Optional) The directory where uploaded files are stored. Default value is "./uploads/".
 - `PDF_EXTRACT_IMAGES`: (Optional) A boolean value indicating whether to extract images from PDF files. Default value is "False".
 - `DEBUG_RAG_API`: (Optional) Set to "True" to show more verbose logging output in the server console, and to enable postgresql database routes
@@ -94,6 +95,23 @@ The following environment variables are required to run the application:
 - `RAG_CHECK_EMBEDDING_CTX_LENGTH` (Optional) Default is true, disabling this will send raw input to the embedder, use this for custom embedding models.
 
 Make sure to set these environment variables before running the application. You can set them in a `.env` file or as system environment variables.
+
+### Markdown Semantic Chunking
+
+The RAG API automatically applies semantic chunking to Markdown files (`.md`) when they are uploaded via the `/embed`, `/local/embed`, or `/embed-upload` endpoints. This feature improves retrieval quality by preserving the natural structure of Markdown documents.
+
+#### How it works:
+
+1. **Header-based splitting**: Markdown files are split **only** by headers (`#`, `##`, `###`, `####`), preserving the document's hierarchical structure and semantic boundaries.
+2. **No arbitrary size limits**: Unlike other file types, Markdown chunks are NOT further split by character count. Each chunk corresponds to a complete section of the document.
+3. **Metadata preservation**: Header metadata is preserved in the chunks, allowing for better context during retrieval.
+
+#### Configuration:
+
+- Set `ENABLE_MARKDOWN_SEMANTIC_CHUNKING=True` (default) to enable this feature
+- Set `ENABLE_MARKDOWN_SEMANTIC_CHUNKING=False` to use standard character-based chunking (with `CHUNK_SIZE` and `CHUNK_OVERLAP`) for all file types including Markdown
+
+This approach ensures that Markdown content is chunked at natural semantic boundaries (section headers), keeping related content together without artificial splits.
 
 ### Use Atlas MongoDB as Vector Database
 
