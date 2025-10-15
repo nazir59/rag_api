@@ -196,12 +196,11 @@ def process_documents(documents: List[Document]) -> str:
     doc_basename = ""
 
     for doc in documents:
-        if "source" in doc.metadata and doc.metadata["source"]:
+        if "source" in doc.metadata:
             doc_basename = doc.metadata["source"].split("/")[-1]
             break
 
-    if doc_basename:
-        processed_text += f"{doc_basename}\n"
+    processed_text += f"{doc_basename}\n"
 
     for doc in documents:
         current_page = doc.metadata.get("page")
