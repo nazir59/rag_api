@@ -323,7 +323,14 @@ async def query_embeddings_by_file_id(
                     f"Unauthorized access attempt by user {user_authorized} to a document with user_id {doc_user_id}"
                 )
 
-        return authorized_documents
+        # Ensure all returned documents have a valid source field in metadata
+        sanitized_documents = []
+        for doc, score in authorized_documents:
+            if "source" not in doc.metadata or not doc.metadata["source"]:
+                doc.metadata["source"] = doc.metadata.get("file_id", "unknown")
+            sanitized_documents.append((doc, score))
+
+        return sanitized_documents
 
     except HTTPException as http_exc:
         logger.error(
@@ -397,18 +404,24 @@ async def store_data_in_vector_db(
             doc.page_content = clean_text(doc.page_content)
 
     # Preparing documents with page content and metadata for insertion.
-    docs = [
-        Document(
-            page_content=doc.page_content,
-            metadata={
-                **(doc.metadata or {}),
-                "file_id": file_id,
-                "user_id": user_id,
-                "digest": generate_digest(doc.page_content),
-            },
+    docs = []
+    for doc in documents:
+        metadata = doc.metadata or {}
+        # Ensure source field always exists - use file_id if not present
+        if "source" not in metadata or not metadata["source"]:
+            metadata["source"] = file_id
+
+        docs.append(
+            Document(
+                page_content=doc.page_content,
+                metadata={
+                    **metadata,
+                    "file_id": file_id,
+                    "user_id": user_id,
+                    "digest": generate_digest(doc.page_content),
+                },
+            )
         )
-        for doc in documents
-    ]
 
     try:
         if isinstance(vector_store, AsyncPgVector):
@@ -720,7 +733,14 @@ async def query_embeddings_by_file_ids(request: Request, body: QueryMultipleBody
                 status_code=404, detail="No documents found for the given query"
             )
 
-        return documents
+        # Ensure all returned documents have a valid source field in metadata
+        sanitized_documents = []
+        for doc, score in documents:
+            if "source" not in doc.metadata or not doc.metadata["source"]:
+                doc.metadata["source"] = doc.metadata.get("file_id", "unknown")
+            sanitized_documents.append((doc, score))
+
+        return sanitized_documents
     except HTTPException as http_exc:
         logger.error(
             "HTTP Exception in query_embeddings_by_file_ids | Status: %d | Detail: %s",
